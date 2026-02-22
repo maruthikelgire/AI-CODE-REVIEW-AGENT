@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Code Review & Rewrite Agent</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/diff@5.1.0/dist/diff.min.js"></script>
+</head>
+
+<body id="body" class="bg-[#0f172a] text-gray-100 min-h-screen transition-all duration-300">
+
+<div class="max-w-5xl mx-auto py-10 px-6 space-y-8">
+
+<!-- Header -->
+<div class="flex justify-between items-center">
+    <h1 class="text-3xl font-semibold tracking-tight">
+        AI Code Review & Rewrite Agent
+    </h1>
+
+    <button onclick="toggleTheme()"
+        class="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
+        Toggle Theme
+    </button>
+</div>
+
+
+<!-- Editor Card -->
+<div id="editorSection" class="bg-[#111827] border border-gray-800 rounded-2xl p-6 shadow-lg space-y-4">
+    <div class="flex justify-between items-center mb-3">
+    <h2 class="text-lg font-semibold">Code Editor</h2>
+    <div class="flex gap-2">
+        <button onclick="copyText('codeInput')" class="tool-btn">Copy</button>
+        <button onclick="toggleZoom('editorSection')" class="tool-btn">Zoom</button>
+    </div>
+    </div>
+    <textarea id="codeInput"
+        class="w-full h-64 p-4 rounded-xl bg-[#0f172a] border border-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none transition"
+        placeholder="Paste your code here..."></textarea>
+
+    <div class="flex gap-4 flex-wrap">
+        <button onclick="reviewCode()"
+            class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 transition font-medium">
+            Review
+        </button>
+
+        <button onclick="rewriteCode()"
+            class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 transition font-medium">
+            Rewrite
+        </button>
+
+        <button onclick="downloadCode()"
+            class="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 transition font-medium">
+            Download
+        </button>
+
+        <div id="loading" class="hidden text-yellow-400 font-medium">
+            Processing...
+        </div>
+    </div>
+
+</div>
+
+<!-- Language Detection -->
+<div id="languageCard"
+     class="card hidden flex items-center justify-between">
+
+    <div>
+        <div class="text-xs uppercase tracking-wider text-gray-400">
+            Detected Programming Language
+        </div>
+
+        <div id="detectedLanguage"
+             class="text-xl font-semibold mt-1">
+            —
+        </div>
+    </div>
+
+    <div id="languageBadge"
+         class="px-4 py-2 rounded-full text-sm font-medium bg-blue-600">
+        Auto Detected
+    </div>
+
+</div>
+
+<!-- Severity Dashboard -->
+<div id="severitySummary"
+     class="grid grid-cols-2 md:grid-cols-4 gap-4 hidden">
+
+    <div class="severity-card bg-red-600">Critical <span id="criticalCount">0</span></div>
+    <div class="severity-card bg-orange-500">High <span id="highCount">0</span></div>
+    <div class="severity-card bg-yellow-500 text-black">Medium <span id="mediumCount">0</span></div>
+    <div class="severity-card bg-green-600">Low <span id="lowCount">0</span></div>
+
+</div>
+
+<!-- Results -->
+<div id="resultsSection"
+     class="grid md:grid-cols-2 gap-6 hidden">
+
+<!-- Issues -->
+<div id="issuesSection" class="card">
+<div class="flex justify-between items-center mb-2">
+    <h2 class="card-title">Issues</h2>
+    <button onclick="toggleZoom('issuesSection')" class="tool-btn">Zoom</button>
+</div>
+<div id="issuesList" class="text-sm space-y-2 text-gray-300"></div>
+</div>
+
+<!-- Rewritten -->
+<div id="rewriteSection" class="card">
+<div class="flex justify-between items-center mb-2">
+    <h2 class="card-title">Rewritten Code</h2>
+    <div class="flex gap-2">
+        <button onclick="copyText('rewrittenCode')" class="tool-btn">Copy</button>
+        <button onclick="toggleZoom('rewriteSection')" class="tool-btn">Zoom</button>
+    </div>
+</div>
+<pre class="overflow-auto max-h-96">
+<code id="rewrittenCode"></code>
+    </pre>
+</div>
+
+</div>
+
+<!-- Diff -->
+<div id="diffSection"
+     class="card hidden">
+
+<div class="flex justify-between items-center mb-2">
+    <h2 class="card-title">Code Differences</h2>
+    <div class="flex gap-2">
+        <button onclick="copyText('diffOutput')" class="tool-btn">Copy</button>
+        <button onclick="toggleZoom('diffSection')" class="tool-btn">Zoom</button>
+    </div>
+    </div>
+    <pre class="overflow-auto max-h-96">
+<code id="diffOutput"></code>
+    </pre>
+</div>
+
+</div>
+
+<style>
+.card {
+    background:#111827;
+    border:1px solid #1f2937;
+    border-radius:1rem;
+    padding:1.5rem;
+    box-shadow:0 10px 25px rgba(0,0,0,0.3);
+}
+
+.card-title {
+    font-weight:600;
+    margin-bottom:1rem;
+}
+
+#languageCard {
+    transition: all 0.3s ease;
+}
+
+
+.severity-card {
+    padding:1rem;
+    border-radius:1rem;
+    font-weight:600;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.tool-btn {
+    background:#374151;
+    padding:4px 10px;
+    border-radius:8px;
+    font-size:12px;
+    transition:0.2s;
+}
+.tool-btn:hover {
+    background:#4b5563;
+}
+
+</style>
+
+<script>
+
+const API_BASE = "http://127.0.0.1:8000";
+let currentZoom = null;
+
+function toggleZoom(sectionId) {
+
+    const section = document.getElementById(sectionId);
+
+    if (currentZoom === sectionId) {
+        section.classList.remove("fixed","inset-0","z-50","m-6","overflow-auto");
+        currentZoom = null;
+    } else {
+
+        if (currentZoom) toggleZoom(currentZoom);
+
+        section.classList.add("fixed","inset-0","z-50","m-6","overflow-auto");
+        currentZoom = sectionId;
+    }
+}
+
+
+document.addEventListener("keydown", function(e){
+    if (e.key === "Escape" && currentZoom) {
+        toggleZoom(currentZoom);
+    }
+});
+
+function copyText(elementId) {
+
+    const el = document.getElementById(elementId);
+
+    const text = el.tagName === "TEXTAREA"
+        ? el.value
+        : el.textContent;
+
+    if (!text.trim()) {
+        alert("Nothing to copy.");
+        return;
+    }
+
+    navigator.clipboard.writeText(text).then(showToast);
+}
+
+function showToast() {
+
+    const msg = document.createElement("div");
+    msg.innerText = "Copied ✓";
+
+    msg.className =
+        "fixed top-6 right-6 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50";
+
+    document.body.appendChild(msg);
+
+    setTimeout(()=>msg.remove(),1500);
+}
+
+
+function toggleTheme() {
+    const body = document.getElementById("body");
+
+    if (body.classList.contains("bg-[#0f172a]")) {
+        body.classList.remove("bg-[#0f172a]", "text-gray-100");
+        body.classList.add("bg-white", "text-black");
+    } else {
+        body.classList.remove("bg-white", "text-black");
+        body.classList.add("bg-[#0f172a]", "text-gray-100");
+    }
+}
+
+function showLoading(show) {
+    document.getElementById("loading")
+        .classList.toggle("hidden", !show);
+}
+
+async function reviewCode() {
+
+    const code = document.getElementById("codeInput").value;
+    if (!code.trim()) return alert("Please enter code.");
+
+    showLoading(true);
+
+    const response = await fetch(`${API_BASE}/api/review`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ code })
+    });
+
+    const result = await response.json();
+    showLoading(false);
+
+    displayReview(result);
+}
+function displayReview(result) {
+
+    // Show language card
+    const languageCard = document.getElementById("languageCard");
+    languageCard.classList.remove("hidden");
+
+    // Set language text
+    document.getElementById("detectedLanguage")
+    .innerText = result.language;
+
+    // Dynamic badge color
+    const badge = document.getElementById("languageBadge");
+
+    badge.className =
+    "px-4 py-2 rounded-full text-sm font-medium";
+
+    if (result.language.toLowerCase().includes("python")) {
+    badge.classList.add("bg-yellow-500", "text-black");
+    }
+    else if (result.language.toLowerCase().includes("javascript")) {
+    badge.classList.add("bg-yellow-400", "text-black");
+    }
+    else if (result.language.toLowerCase().includes("java")) {
+    badge.classList.add("bg-red-600");
+    }
+    else if (result.language.toLowerCase().includes("c++")) {
+    badge.classList.add("bg-blue-600");
+    }
+    else {
+    badge.classList.add("bg-gray-600");
+    }
+
+    document.getElementById("severitySummary")
+        .classList.remove("hidden");
+
+    document.getElementById("resultsSection")
+        .classList.remove("hidden");
+
+    document.getElementById("criticalCount").innerText = result.critical;
+    document.getElementById("highCount").innerText = result.high;
+    document.getElementById("mediumCount").innerText = result.medium;
+    document.getElementById("lowCount").innerText = result.low;
+
+    const issuesList = document.getElementById("issuesList");
+    issuesList.innerHTML = "";
+
+    const severityColors = {
+        critical: "bg-red-900 border-red-600",
+        high: "bg-orange-900 border-orange-500",
+        medium: "bg-yellow-900 border-yellow-500",
+        low: "bg-green-900 border-green-500"
+    };
+
+    for (const category in result.review) {
+
+        const issues = result.review[category];
+
+        if (issues.length > 0) {
+
+            issuesList.innerHTML += `
+                <div class="mt-6">
+                    <div class="text-sm uppercase tracking-wide text-gray-400 mb-2">
+                        ${category}
+                    </div>
+                </div>
+            `;
+
+            issues.forEach(issue => {
+
+                issuesList.innerHTML += `
+                    <div class="p-4 rounded-xl border ${severityColors[category]} mb-3">
+                        <div class="text-sm leading-relaxed">
+                            ${issue}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+    }
+}
+
+async function rewriteCode() {
+
+    const originalCode = document.getElementById("codeInput").value;
+
+    if (!originalCode.trim()) {
+        alert("Please enter code.");
+        return;
+    }
+
+    showLoading(true);
+
+    try {
+
+        const response = await fetch(`${API_BASE}/api/rewrite`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code: originalCode })
+        });
+
+        const result = await response.json();
+
+        showLoading(false);
+
+        const rewrittenCode = result.rewritten_code;
+
+        if (!rewrittenCode) {
+            alert("Rewrite API returned empty response.");
+            return;
+        }
+
+        // Show rewritten code
+        const codeBlock = document.getElementById("rewrittenCode");
+        codeBlock.textContent = rewrittenCode;
+        hljs.highlightElement(codeBlock);
+
+        // Force show diff section
+        const diffSection = document.getElementById("diffSection");
+        diffSection.classList.remove("hidden");
+
+        // SAFETY: If Diff not loaded
+        if (typeof Diff === "undefined") {
+            document.getElementById("diffOutput").textContent =
+                "Diff library not loaded.";
+            return;
+        }
+
+        // If identical
+        if (originalCode.trim() === rewrittenCode.trim()) {
+            document.getElementById("diffOutput").textContent =
+                "No changes detected. Rewritten code is identical.";
+            return;
+        }
+
+        // Generate diff
+        const diffText = Diff.createTwoFilesPatch(
+            "Original",
+            "Rewritten",
+            originalCode,
+            rewrittenCode,
+            "",
+            ""
+        );
+
+        document.getElementById("diffOutput").textContent = diffText;
+
+    } catch (error) {
+        showLoading(false);
+        console.error(error);
+        alert("Rewrite failed.");
+    }
+}
+
+function downloadCode() {
+    const code = document.getElementById("rewrittenCode").textContent;
+    if (!code.trim()) return alert("No rewritten code available.");
+
+    const blob = new Blob([code], {type:"text/plain"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "rewritten_code.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+
+
+</script>
+
+</body>
+</html>
